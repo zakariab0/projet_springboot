@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Smart Farm Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; display: flex; }
+        h1 { color: #2E7D32; }
+        h2 { color: #4CAF50; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 5px 0; padding: 10px; background: #F1F8E9; border-radius: 5px; }
+        a { color: #1976D2; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        canvas { max-width: 400px; margin: 10px 0; }
+        .left-column { width: 50%; padding-right: 20px; }
+        .right-column { width: 50%; }
+        .scrollable-alerts { max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+        button { margin-left: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #45a049; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="left-column">
+    <h1>My Tomato Farm Dashboard</h1>
+    <p><strong>Temperature:</strong> <span th:text="${temperature}"></span> °C</p>
+    <p><strong>Humidite:</strong> <span th:text="${soilMoisture}"></span> %</p>
+
+    <h2>Alerts & Recommendations</h2>
+    <div class="scrollable-alerts">
+        <ul>
+            <li th:each="alert : ${alerts}">
+                <span th:text="${alert.typeAlerte}"></span> -
+                Measured: <span th:text="${alert.valeurMesuree}"></span>,
+                Limit: <span th:text="${alert.seuil}"></span>,
+                Time: <span th:text="${alert.horodatage}"></span>,
+                Status: <span th:text="${alert.statut}"></span>
+                <br/>
+                <strong>Do this:</strong> <span th:text="${alert.recommendation}"></span>
+                <form th:action="@{/toggle-alert-status}" method="post" style="display: inline;">
+                    <input type="hidden" name="alertId" th:value="${alert.id}"/>
+                    <button type="submit" th:text="${alert.statut == 'Traite' ? 'Sauvegarder comme non traite' : 'Sauvegarder comme traite'}"></button>
+                </form>
+            </li>
+            <li th:if="${#lists.isEmpty(alerts)}">No alerts or tips right now!</li>
+        </ul>
+    </div>
+
+    <h2>Recent Readings Report</h2>
+    <ul>
+        <li th:each="data : ${recentData}">
+            <span th:text="${data.capteur.typeCapteur}"></span>:
+            <span th:text="${data.valeur}"></span>
+            <span th:text="${data.capteur.uniteMesure}"></span>
+            at <span th:text="${data.horodatage}"></span>
+        </li>
+        <li th:if="${#lists.isEmpty(recentData)}">No readings yet!</li>
+    </ul>
+
+    <a href="/dashboard">Refresh</a>
+</div>
+
+<div class="right-column">
+    <h2>Trends</h2>
+    <canvas id="tempChart"></canvas>
+    <canvas id="moistureChart"></canvas>
+</div>
+
+<script th:src="@{/js/charts.js}"></script>
+<script>
+    window.onload = function() {
+        const tempData = /*[[${tempGraphData}]]*/ [];
+        const moistureData = /*[[${moistureGraphData}]]*/ [];
+        console.log('Temp Data from Thymeleaf:', tempData);
+        console.log('Moisture Data from Thymeleaf:', moistureData);
+        if (typeof Chart !== 'undefined') {
+            createCharts(tempData, moistureData);
+        } else {
+            console.error('Chart.js not loaded!');
+        }
+    };
+</script>
+</body>
+</html>
