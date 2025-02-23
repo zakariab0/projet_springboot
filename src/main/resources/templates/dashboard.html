@@ -17,13 +17,14 @@
         button { margin-left: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer; }
         button:hover { background: #45a049; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <!-- Load Google Charts -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 </head>
 <body>
 <div class="left-column">
     <h1>My Tomato Farm Dashboard</h1>
     <p><strong>Temperature:</strong> <span th:text="${temperature}"></span> °C</p>
-    <p><strong>Humidite:</strong> <span th:text="${soilMoisture}"></span> %</p>
+    <p><strong>Soil Moisture:</strong> <span th:text="${soilMoisture}"></span> %</p>
 
     <h2>Alerts & Recommendations</h2>
     <div class="scrollable-alerts">
@@ -38,7 +39,7 @@
                 <strong>Do this:</strong> <span th:text="${alert.recommendation}"></span>
                 <form th:action="@{/toggle-alert-status}" method="post" style="display: inline;">
                     <input type="hidden" name="alertId" th:value="${alert.id}"/>
-                    <button type="submit" th:text="${alert.statut == 'Traite' ? 'Sauvegarder comme non traite' : 'Sauvegarder comme traite'}"></button>
+                    <button type="submit" th:text="${alert.statut == 'Traite' ? 'Mark as Untreated' : 'Mark as Treated'}"></button>
                 </form>
             </li>
             <li th:if="${#lists.isEmpty(alerts)}">No alerts or tips right now!</li>
@@ -61,23 +62,57 @@
 
 <div class="right-column">
     <h2>Trends</h2>
-    <canvas id="tempChart"></canvas>
-    <canvas id="moistureChart"></canvas>
+    <div id="tempChart" style="width: 400px; height: 200px;"></div>
+    <div id="moistureChart" style="width: 400px; height: 200px;"></div>
 </div>
 
-<script th:src="@{/js/charts.js}"></script>
-<script>
-    window.onload = function() {
-        const tempData = /*[[${tempGraphData}]]*/ [];
-        const moistureData = /*[[${moistureGraphData}]]*/ [];
-        console.log('Temp Data from Thymeleaf:', tempData);
-        console.log('Moisture Data from Thymeleaf:', moistureData);
-        if (typeof Chart !== 'undefined') {
-            createCharts(tempData, moistureData);
-        } else {
-            console.error('Chart.js not loaded!');
-        }
-    };
+<script th:inline="javascript">
+    google.charts.load('current', {packages: ['corechart']});
+    google.charts.setOnLoadCallback(drawCharts);
+
+    function drawCharts() {
+        const tempTimes = /*[[${tempTimes}]]*/ [];
+        const tempValues = /*[[${tempValues}]]*/ [];
+        const moistureTimes = /*[[${moistureTimes}]]*/ [];
+        const moistureValues = /*[[${moistureValues}]]*/ [];
+
+        console.log('Temp Times:', tempTimes);
+        console.log('Temp Values:', tempValues);
+        console.log('Moisture Times:', moistureTimes);
+        console.log('Moisture Values:', moistureValues);
+
+        // Temperature Chart
+        var tempData = new google.visualization.DataTable();
+        tempData.addColumn('string', 'Time');
+        tempData.addColumn('number', 'Temperature (°C)');
+        tempData.addRows(tempTimes.map((time, index) => [time, tempValues[index] || 0]));
+
+        var tempOptions = {
+            title: 'Temperature',
+            hAxis: { title: 'Time', titleTextStyle: { color: '#333' } },
+            vAxis: { title: '°C', minValue: 0, maxValue: 50 },
+            legend: { position: 'none' }
+        };
+
+        var tempChart = new google.visualization.LineChart(document.getElementById('tempChart'));
+        tempChart.draw(tempData, tempOptions);
+
+        // Soil Moisture Chart
+        var moistureData = new google.visualization.DataTable();
+        moistureData.addColumn('string', 'Time');
+        moistureData.addColumn('number', 'Soil Moisture (%)');
+        moistureData.addRows(moistureTimes.map((time, index) => [time, moistureValues[index] || 0]));
+
+        var moistureOptions = {
+            title: 'Soil Moisture',
+            hAxis: { title: 'Time', titleTextStyle: { color: '#333' } },
+            vAxis: { title: '%', minValue: 0, maxValue: 100 },
+            legend: { position: 'none' }
+        };
+
+        var moistureChart = new google.visualization.LineChart(document.getElementById('moistureChart'));
+        moistureChart.draw(moistureData, moistureOptions);
+    }
 </script>
 </body>
 </html>

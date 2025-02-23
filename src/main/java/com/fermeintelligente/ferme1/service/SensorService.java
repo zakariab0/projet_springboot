@@ -11,7 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,9 +21,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
-@Service
+@Component
 public class SensorService {
 
     private static final Logger logger = LoggerFactory.getLogger(SensorService.class);
@@ -33,18 +38,68 @@ public class SensorService {
     @Autowired
     private AlerteRepository alerteRepository;
 
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
+
     private static final int TEMP_SENSOR_ID = 1;
     private static final int MOISTURE_SENSOR_ID = 2;
 
+    private final BlockingQueue<BigDecimal> temperatureQueue = new LinkedBlockingQueue<>(1);
+    private final BlockingQueue<BigDecimal> moistureQueue = new LinkedBlockingQueue<>(1);
+
+    private final Random random = new Random();
+
     public BigDecimal getTemperature() {
-        return BigDecimal.valueOf(Math.random() * 40);
+        BigDecimal temp = temperatureQueue.poll(); // Get and remove latest, or null if empty
+        if (temp == null) {
+            // Simulate real sensor data with slight variation around 25.5°C
+            double newTemp = 25.5 + (random.nextDouble() - 0.5) * 5; // ±2.5°C around 25.5
+            temp = BigDecimal.valueOf(newTemp).setScale(1, BigDecimal.ROUND_HALF_UP);
+            logger.info("No Kafka temperature data yet, using simulated: " + temp + "°C");
+            produceSensorData("temperature", temp);
+        }
+        return temp;
     }
 
     public BigDecimal getSoilMoisture() {
-        return BigDecimal.valueOf(Math.random() * 100);
+        BigDecimal moisture = moistureQueue.poll(); // Get and remove latest, or null if empty
+        if (moisture == null) {
+            // Simulate real sensor data with slight variation around 80.0%
+            double newMoisture = 80.0 + (random.nextDouble() - 0.5) * 10; // ±5% around 80.0
+            moisture = BigDecimal.valueOf(newMoisture).setScale(1, BigDecimal.ROUND_HALF_UP);
+            logger.info("No Kafka moisture data yet, using simulated: " + moisture + "%");
+            produceSensorData("soil_moisture", moisture);
+        }
+        return moisture;
     }
 
-    //la fonction catreer des nouvelles donnees dyal les capteurs(humidite awela temperature)
+    private void produceSensorData(String type, BigDecimal value) {
+        kafkaTemplate.send("farm-data", type + "," + value.toString());
+        logger.info("Produced to Kafka: " + type + "," + value);
+    }
+
+    @KafkaListener(topics = "farm-data", groupId = "smart-farm-group")
+    public void listenFarmData(String message) {
+        try {
+            String[] parts = message.split(",", 2);
+            if (parts.length == 2) {
+                String type = parts[0];
+                BigDecimal value = new BigDecimal(parts[1]);
+                if ("temperature".equals(type)) {
+                    temperatureQueue.poll(); // Clear old value
+                    temperatureQueue.offer(value);
+                    logger.info("Consumed Kafka temperature: " + value);
+                } else if ("soil_moisture".equals(type)) {
+                    moistureQueue.poll(); // Clear old value
+                    moistureQueue.offer(value);
+                    logger.info("Consumed Kafka soil moisture: " + value);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error parsing Kafka message: " + message, e);
+        }
+    }
+
     public void saveSensorData(String typeCapteur, BigDecimal valeur) {
         int sensorId = "temperature".equals(typeCapteur) ? TEMP_SENSOR_ID : MOISTURE_SENSOR_ID;
         Capteur capteur = capteurRepository.findById(sensorId).orElseGet(() -> {
@@ -56,7 +111,7 @@ public class SensorService {
             newCapteur.setDateInstallation(new Date());
             newCapteur.setStatut(Capteur.Statut.Actif);
             Capteur savedCapteur = capteurRepository.save(newCapteur);
-            logger.info("Nouveau Sensor: ID=" + savedCapteur.getId() + " pour " + typeCapteur);
+            logger.info("Created new sensor: ID=" + savedCapteur.getId() + " for " + typeCapteur);
             return savedCapteur;
         });
 
@@ -65,20 +120,18 @@ public class SensorService {
         data.setValeur(valeur);
         data.setHorodatage(LocalDateTime.now());
         donneesCapteurRepository.save(data);
-        logger.info("Data sauvegarde " + typeCapteur + ": " + valeur + " avec capteur_id=" + capteur.getId());
+        logger.info("Saved data for " + typeCapteur + ": " + valeur + " with capteur_id=" + capteur.getId());
         checkForAlerts(capteur, valeur);
     }
 
-    //had la fonction katcreer les alertes m3a la recommendation
     private void checkForAlerts(Capteur capteur, BigDecimal valeur) {
         if (capteur.getTypeCapteur().equals("temperature") && valeur.compareTo(BigDecimal.valueOf(35)) > 0) {
-            saveAlert(capteur, "Temperature Elevee!", BigDecimal.valueOf(35), valeur, "Ajouter ombre");
+            saveAlert(capteur, "Too Hot!", BigDecimal.valueOf(35), valeur, "Add some shade to cool things down!");
         } else if (capteur.getTypeCapteur().equals("soil_moisture") && valeur.compareTo(BigDecimal.valueOf(75)) < 0) {
-            saveAlert(capteur, "Humidite baissee!", BigDecimal.valueOf(75), valeur, "Ajouter l'eau");
+            saveAlert(capteur, "Soil Too Dry!", BigDecimal.valueOf(75), valeur, "Water the tomatoes now!");
         }
     }
 
-    //la fonction katsauvegarder l'alerte creee
     private void saveAlert(Capteur capteur, String typeAlerte, BigDecimal seuil, BigDecimal valeur, String recommendation) {
         Alerte alerte = new Alerte();
         alerte.setCapteur(capteur);
@@ -91,8 +144,7 @@ public class SensorService {
         alerteRepository.save(alerte);
     }
 
-    //fonction dyal marquer chi alerte comme traite/non traite
-    public void toggleAlertStatus(int alertId) { // Changed to toggle
+    public void toggleAlertStatus(int alertId) {
         Alerte alerte = alerteRepository.findById(alertId).orElseThrow(() -> new RuntimeException("Alert not found"));
         if (alerte.getStatut() == Alerte.Statut.Non_traite) {
             alerte.setStatut(Alerte.Statut.Traite);
@@ -104,12 +156,10 @@ public class SensorService {
         alerteRepository.save(alerte);
     }
 
-    //katjbd les donnees des alertes
     public List<Alerte> getLatestAlerts() {
         return alerteRepository.findAll();
     }
 
-    //katjbd les donnees des capteurs
     public List<DonneesCapteur> getRecentSensorData() {
         return donneesCapteurRepository.findAll(
                 PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "horodatage"))
@@ -118,8 +168,8 @@ public class SensorService {
 
     public List<GraphData> getTemperatureGraphData() {
         List<DonneesCapteur> data = donneesCapteurRepository.findAll(
-                PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "horodatage"))
-        ).getContent();
+                Sort.by(Sort.Direction.ASC, "horodatage")
+        ); // Use List directly, no Page
 
         List<GraphData> tempData = data.stream()
                 .filter(d -> d.getCapteur().getId() == TEMP_SENSOR_ID)
@@ -131,7 +181,7 @@ public class SensorService {
 
         if (tempData.isEmpty()) {
             tempData = new ArrayList<>();
-            tempData.add(new GraphData("00:00:00", 0.0));
+            tempData.add(new GraphData("00:00:00", getTemperature().doubleValue()));
             tempData.add(new GraphData(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), getTemperature().doubleValue()));
         }
         logger.info("Returning " + tempData.size() + " temp points: " + tempData);
@@ -140,8 +190,8 @@ public class SensorService {
 
     public List<GraphData> getMoistureGraphData() {
         List<DonneesCapteur> data = donneesCapteurRepository.findAll(
-                PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "horodatage"))
-        ).getContent();
+                Sort.by(Sort.Direction.ASC, "horodatage")
+        ); // Use List directly, no Page
 
         List<GraphData> moistureData = data.stream()
                 .filter(d -> d.getCapteur().getId() == MOISTURE_SENSOR_ID)
@@ -153,7 +203,7 @@ public class SensorService {
 
         if (moistureData.isEmpty()) {
             moistureData = new ArrayList<>();
-            moistureData.add(new GraphData("00:00:00", 0.0));
+            moistureData.add(new GraphData("00:00:00", getSoilMoisture().doubleValue()));
             moistureData.add(new GraphData(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), getSoilMoisture().doubleValue()));
         }
         logger.info("Returning " + moistureData.size() + " moisture points: " + moistureData);

@@ -1,15 +1,15 @@
 // src/main/resources/static/js/charts.js
-function createCharts(temperatureData, moistureData) {
-    console.log('Creating charts with:', temperatureData, moistureData); // Debug
+function createCharts(tempTimes, tempValues, moistureTimes, moistureValues) {
+    console.log('Creating charts with:', tempTimes, tempValues, moistureTimes, moistureValues);
 
     const tempCtx = document.getElementById('tempChart').getContext('2d');
     new Chart(tempCtx, {
         type: 'line',
         data: {
-            labels: temperatureData.map(d => d.time),
+            labels: tempTimes,
             datasets: [{
                 label: 'Temperature (°C)',
-                data: temperatureData.map(d => d.value),
+                data: tempValues,
                 borderColor: '#FF5722',
                 fill: false
             }]
@@ -23,10 +23,10 @@ function createCharts(temperatureData, moistureData) {
     new Chart(moistureCtx, {
         type: 'line',
         data: {
-            labels: moistureData.map(d => d.time),
+            labels: moistureTimes,
             datasets: [{
                 label: 'Soil Moisture (%)',
-                data: moistureData.map(d => d.value),
+                data: moistureValues,
                 borderColor: '#4CAF50',
                 fill: false
             }]

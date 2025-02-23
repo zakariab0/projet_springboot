@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 public class DashboardController {
@@ -40,18 +41,22 @@ public class DashboardController {
         List<DonneesCapteur> recentData = sensorService.getRecentSensorData();
         model.addAttribute("recentData", recentData);
 
+        // Send simple lists for Google Charts
         List<SensorService.GraphData> tempGraphData = sensorService.getTemperatureGraphData();
         List<SensorService.GraphData> moistureGraphData = sensorService.getMoistureGraphData();
-        model.addAttribute("tempGraphData", tempGraphData);
-        model.addAttribute("moistureGraphData", moistureGraphData);
 
-        logger.info("Temp Graph Data: {} points", tempGraphData.size());
-        logger.info("Moisture Graph Data: {} points", moistureGraphData.size());
+        model.addAttribute("tempTimes", tempGraphData.stream().map(SensorService.GraphData::getTime).collect(Collectors.toList()));
+        model.addAttribute("tempValues", tempGraphData.stream().map(SensorService.GraphData::getValue).collect(Collectors.toList()));
+        model.addAttribute("moistureTimes", moistureGraphData.stream().map(SensorService.GraphData::getTime).collect(Collectors.toList()));
+        model.addAttribute("moistureValues", moistureGraphData.stream().map(SensorService.GraphData::getValue).collect(Collectors.toList()));
+
+        logger.info("Temp Graph Data: " + tempGraphData.size() + " points");
+        logger.info("Moisture Graph Data: " + moistureGraphData.size() + " points");
 
         return "dashboard";
     }
 
-    @PostMapping("/toggle-alert-status") // Updated endpoint
+    @PostMapping("/toggle-alert-status")
     public String toggleAlertStatus(@RequestParam("alertId") int alertId) {
         sensorService.toggleAlertStatus(alertId);
         return "redirect:/dashboard";
