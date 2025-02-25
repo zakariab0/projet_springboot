@@ -55,7 +55,7 @@ public class SensorService {
             // Simulate real sensor data with slight variation around 25.5°C
             double newTemp = 25.5 + (random.nextDouble() - 0.5) * 5; // ±2.5°C around 25.5
             temp = BigDecimal.valueOf(newTemp).setScale(1, BigDecimal.ROUND_HALF_UP);
-            logger.info("No Kafka temperature data yet, using simulated: " + temp + "°C");
+            logger.info("pas de donneses de temperature par kafka, on utilise les donnees par defaut: " + temp + "°C");
             produceSensorData("temperature", temp);
         }
         return temp;
@@ -67,7 +67,7 @@ public class SensorService {
             // Simulate real sensor data with slight variation around 80.0%
             double newMoisture = 80.0 + (random.nextDouble() - 0.5) * 10; // ±5% around 80.0
             moisture = BigDecimal.valueOf(newMoisture).setScale(1, BigDecimal.ROUND_HALF_UP);
-            logger.info("No Kafka moisture data yet, using simulated: " + moisture + "%");
+            logger.info("pas de donneses d'humidite par kafka, on utilise les donnees par defaut: " + moisture + "%");
             produceSensorData("soil_moisture", moisture);
         }
         return moisture;
@@ -75,7 +75,7 @@ public class SensorService {
 
     private void produceSensorData(String type, BigDecimal value) {
         kafkaTemplate.send("farm-data", type + "," + value.toString());
-        logger.info("Produced to Kafka: " + type + "," + value);
+        logger.info("envoye a Kafka: " + type + "," + value);
     }
 
     @KafkaListener(topics = "farm-data", groupId = "smart-farm-group")
@@ -88,15 +88,15 @@ public class SensorService {
                 if ("temperature".equals(type)) {
                     temperatureQueue.poll(); // Clear old value
                     temperatureQueue.offer(value);
-                    logger.info("Consumed Kafka temperature: " + value);
+                    logger.info("temperature envoyee par kafka: " + value);
                 } else if ("soil_moisture".equals(type)) {
                     moistureQueue.poll(); // Clear old value
                     moistureQueue.offer(value);
-                    logger.info("Consumed Kafka soil moisture: " + value);
+                    logger.info("temperature envoyee a kafka: " + value);
                 }
             }
         } catch (Exception e) {
-            logger.error("Error parsing Kafka message: " + message, e);
+            logger.error("erreur au niveau de kafka: " + message, e);
         }
     }
 
@@ -126,9 +126,9 @@ public class SensorService {
 
     private void checkForAlerts(Capteur capteur, BigDecimal valeur) {
         if (capteur.getTypeCapteur().equals("temperature") && valeur.compareTo(BigDecimal.valueOf(35)) > 0) {
-            saveAlert(capteur, "Too Hot!", BigDecimal.valueOf(35), valeur, "Add some shade to cool things down!");
+            saveAlert(capteur, "Chaud!", BigDecimal.valueOf(35), valeur, "ajouter l'ombre");
         } else if (capteur.getTypeCapteur().equals("soil_moisture") && valeur.compareTo(BigDecimal.valueOf(75)) < 0) {
-            saveAlert(capteur, "Soil Too Dry!", BigDecimal.valueOf(75), valeur, "Water the tomatoes now!");
+            saveAlert(capteur, "manque d'humidite!", BigDecimal.valueOf(75), valeur, "ajouter d'eau!");
         }
     }
 

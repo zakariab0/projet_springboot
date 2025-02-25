@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Smart Farm Dashboard</title>
+    <title>Smart Agri Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; display: flex; }
         h1 { color: #2E7D32; }
@@ -22,31 +22,31 @@
 </head>
 <body>
 <div class="left-column">
-    <h1>My Tomato Farm Dashboard</h1>
+    <h1>Smart Agri Dashboard</h1>
     <p><strong>Temperature:</strong> <span th:text="${temperature}"></span> °C</p>
-    <p><strong>Soil Moisture:</strong> <span th:text="${soilMoisture}"></span> %</p>
+    <p><strong>Humidite:</strong> <span th:text="${soilMoisture}"></span> %</p>
 
-    <h2>Alerts & Recommendations</h2>
+    <h2>Alertes & Recommendations</h2>
     <div class="scrollable-alerts">
         <ul>
             <li th:each="alert : ${alerts}">
                 <span th:text="${alert.typeAlerte}"></span> -
-                Measured: <span th:text="${alert.valeurMesuree}"></span>,
-                Limit: <span th:text="${alert.seuil}"></span>,
-                Time: <span th:text="${alert.horodatage}"></span>,
-                Status: <span th:text="${alert.statut}"></span>
+                Mesure: <span th:text="${alert.valeurMesuree}"></span>,
+                Limite: <span th:text="${alert.seuil}"></span>,
+                Date & Heure: <span th:text="${alert.horodatage}"></span>,
+                Etat: <span th:text="${alert.statut}"></span>
                 <br/>
-                <strong>Do this:</strong> <span th:text="${alert.recommendation}"></span>
+                <strong>Solution:</strong> <span th:text="${alert.recommendation}"></span>
                 <form th:action="@{/toggle-alert-status}" method="post" style="display: inline;">
                     <input type="hidden" name="alertId" th:value="${alert.id}"/>
                     <button type="submit" th:text="${alert.statut == 'Traite' ? 'Mark as Untreated' : 'Mark as Treated'}"></button>
                 </form>
             </li>
-            <li th:if="${#lists.isEmpty(alerts)}">No alerts or tips right now!</li>
+            <li th:if="${#lists.isEmpty(alerts)}">Aucune Alerte</li>
         </ul>
     </div>
 
-    <h2>Recent Readings Report</h2>
+    <h2>Derniers rapports</h2>
     <ul>
         <li th:each="data : ${recentData}">
             <span th:text="${data.capteur.typeCapteur}"></span>:
@@ -54,10 +54,10 @@
             <span th:text="${data.capteur.uniteMesure}"></span>
             at <span th:text="${data.horodatage}"></span>
         </li>
-        <li th:if="${#lists.isEmpty(recentData)}">No readings yet!</li>
+        <li th:if="${#lists.isEmpty(recentData)}">Aucun Rapport!</li>
     </ul>
 
-    <a href="/dashboard">Refresh</a>
+    <a href="/dashboard">Refraichir</a>
 </div>
 
 <div class="right-column">
